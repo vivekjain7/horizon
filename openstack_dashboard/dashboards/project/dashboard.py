@@ -34,6 +34,7 @@ class NetworkPanels(horizon.PanelGroup):
               'networks',
               'routers',
               'loadbalancers',
+              'loadbalancersv2',
               'firewalls',
               'vpn',)
 

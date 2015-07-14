@@ -39,6 +39,7 @@ from openstack_dashboard.api import glance
 from openstack_dashboard.api import heat
 from openstack_dashboard.api import keystone
 from openstack_dashboard.api import lbaas
+from openstack_dashboard.api import lbaasv2
 from openstack_dashboard.api import network
 from openstack_dashboard.api import neutron
 from openstack_dashboard.api import nova
@@ -56,6 +57,7 @@ __all__ = [
     "heat",
     "keystone",
     "lbaas",
+    "lbaasv2",
     "network",
     "neutron",
     "nova",
