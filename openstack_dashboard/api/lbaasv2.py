@@ -253,36 +253,123 @@ def vip_list(request, **kwargs):
     return [Vip(v) for v in vips]
 
 
+def create_loadbalancer_full(request, **kwargs):
+    loadbalancer_body = {'loadbalancer': {'name': kwargs['name'],
+                                          'description': kwargs['description'],
+                                          'vip_subnet_id': '0977e37d-4f50-4225-a2cf-b268540aee48', #kwargs['subnet_id'],
+                                          'admin_state_up': kwargs['admin_state_up'],
+                                          'vip_address': kwargs['address'],
+                                          # 'provider': 'HAProxy'
+                                          }}
+
+    listener_body = {'listener': {'name': kwargs['name'],
+                                  'description': kwargs['description'],
+                                  'protocol': kwargs['protocol'],
+                                  'protocol_port': kwargs['protocol_port'],
+                                  'default_tls_container_id': None,
+                                  'sni_container_ids': [],
+                                  'connection_limit': 100,
+                                  'admin_state_up': kwargs['admin_state_up'],
+                                  'loadbalancer_id': None}}
+
+    pool_body = {'pool': {'name': kwargs['name'],
+                          'description': kwargs['description'],
+                          'protocol': kwargs['protocol'],
+                          'lb_method': kwargs['lb_method'],
+                          'admin_state_up': kwargs['admin_state_up']
+                          }}
+
+    member_body = {'member': {'pool_id': kwargs['pool_id'],
+                              'address': kwargs['address'],
+                              'protocol_port': kwargs['protocol_port'],
+                              'admin_state_up': kwargs['admin_state_up'],
+                              'pool_id': None
+                              }}
+    if kwargs.get('weight'):
+        member_body['member']['weight'] = kwargs['weight']
+
+    monitor_type = kwargs['type'].upper()
+
+    health_monitor_body = {'health_monitor': {'tenant_id': kwargs['tenant_id'],
+                           'type': monitor_type,
+                           'delay': kwargs['delay'],
+                           'timeout': kwargs['timeout'],
+                           'max_retries': kwargs['max_retries'],
+                           'admin_state_up': kwargs['admin_state_up'],
+                           'pool_id': None
+                           }}
+
+    if monitor_type in ['HTTP', 'HTTPS']:
+        health_monitor_body['health_monitor']['http_method'] = kwargs['http_method']
+        health_monitor_body['health_monitor']['url_path'] = kwargs['url_path']
+        health_monitor_body['health_monitor']['expected_codes'] = kwargs['expected_codes']
+
+    try:
+        loadbalancer = neutronclient(request).create_loadbalancer(loadbalancer_body).get('loadbalancer')
+        listener_body['listener']['loadbalancer_id'] = loadbalancer['id']
+        listener = neutronclient(request).create_listener(listener_body).get('listener')
+        pool = neutronclient(request).create_lbaas_pool(pool_body).get('pool')
+        member_body['member']['pool_id'] = pool['id']
+        health_monitor_body['health_monitor']['pool_id'] = pool['id']
+        health_monitor = neutronclient(request).create_lbaas_healthmonitor(health_monitor_body).get('health_monitor')
+        member = neutronclient(request).create_lbaas_member(member_body).get('member')
+    except Exception as e:
+                raise Exception(_("Could not create full loadbalancer."))
+    return [LBDetails(loadbalancer, listener, pool, member, health_monitor)]
+
+
 def list_loadbalancers(request, **kwargs):
     vips = neutronclient(request).list_loadbalancers(**kwargs)
+    vips = [] if not vips else vips
     vips = vips.get('loadbalancers')
     for vip in vips:
         listeners = vip.get('listeners')
+        listeners = [] if not listeners else listeners
+
         for listener in listeners:
             listener = neutronclient(request).show_listener(listener.get('id'), **kwargs)
+            if not listener:
+                continue
             listener = listener.get('listener')
+
             try:
                 pool = neutronclient(request).show_lbaas_pool(listener.get('default_pool_id'), **kwargs)
+                if not pool:
+                    continue
                 pool = pool.get('pool')
-                health_monitor = neutronclient(request).show_lbaas_healthmonitor(pool.get('healthmonitor_id'), **kwargs)
-                health_monitor = health_monitor.get('healthmonitor')
+                if pool.get('healthmonitor_id'):
+                    health_monitor = neutronclient(request).show_lbaas_healthmonitor(pool.get('healthmonitor_id'), **kwargs)
+                    health_monitor = health_monitor.get('healthmonitor')
+
                 members = neutronclient(request).list_lbaas_members(listener.get('default_pool_id'), **kwargs)
+
             except Exception as e:
+                print e
                 raise Exception(_("Could not get load balancer list."))
     return [LBDetails(v, listener, pool, members, health_monitor) for v in vips]
 
 
 def show_loadbalancer(request, lbaas_loadbalancer, **kwargs):
     vip = neutronclient(request).show_loadbalancer(lbaas_loadbalancer, **kwargs)
+    if not vip:
+        return
     loadbalancer = vip.get('loadbalancer')
-    viplisteners=loadbalancer.get('listeners')
+    viplisteners = loadbalancer.get('listeners')
+    if not viplisteners:
+        return
     for viplistener in viplisteners:
         listener = neutronclient(request).show_listener(viplistener.get('id'), **kwargs)
+        if not listener:
+            continue
         listener = listener.get('listener')
         pool = neutronclient(request).show_lbaas_pool(listener.get('default_pool_id'), **kwargs)
+        if not pool:
+            continue
         pool = pool.get('pool')
-        health_monitor = neutronclient(request).show_lbaas_healthmonitor(pool.get('healthmonitor_id'), **kwargs)
-        health_monitor = health_monitor.get('healthmonitor')
+        health_monitor = None
+        if pool.get('healthmonitor_id'):
+            health_monitor = neutronclient(request).show_lbaas_healthmonitor(pool.get('healthmonitor_id'), **kwargs)
+            health_monitor = health_monitor.get('healthmonitor')
         members = neutronclient(request).list_lbaas_members(listener.get('default_pool_id'), **kwargs)
     return LBDetails(vip.get('loadbalancer'), listener, pool, members, health_monitor)
 

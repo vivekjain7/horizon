@@ -28,21 +28,21 @@ class LoadBalancer(horizon.Panel):
     permissions = ('openstack.services.network',)
 
     def allowed(self, context):
-        request = context['request']
-        if not request.user.has_perms(self.permissions):
-            return False
-        try:
-            if not neutron.is_service_enabled(request,
-                                              config_name='enable_lb',
-                                              ext_name='lbaas'):
-                return False
-        except Exception:
-            LOG.error("Call to list enabled services failed. This is likely "
-                      "due to a problem communicating with the Neutron "
-                      "endpoint. Load Balancers panel will not be displayed.")
-            return False
-        if not super(LoadBalancer, self).allowed(context):
-            return False
+        # request = context['request']
+        # if not request.user.has_perms(self.permissions):
+        #     return False
+        # try:
+        #     if not neutron.is_service_enabled(request,
+        #                                       config_name='enable_lb',
+        #                                       ext_name='lbaas'):
+        #         return False
+        # except Exception:
+        #     LOG.error("Call to list enabled services failed. This is likely "
+        #               "due to a problem communicating with the Neutron "
+        #               "endpoint. Load Balancers panel will not be displayed.")
+        #     return False
+        # if not super(LoadBalancer, self).allowed(context):
+        #     return False
         return True
 
 

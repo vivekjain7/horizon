@@ -423,7 +423,7 @@ class LaunchLoadBalancer(workflows.Workflow):
                 tokens = address.split(':')
                 address = tokens[0]
 
-            api.lbui.vip_create(request,
+            api.lbaasv2.create_loadbalancer_full(request,
                                 address=address,
                                 name=context['name'],
                                 description=context['description'],
